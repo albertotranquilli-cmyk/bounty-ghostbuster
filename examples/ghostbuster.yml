@@ -1,0 +1,18 @@
+# Copy to .github/workflows/ghostbuster.yml in YOUR repository.
+name: bounty-ghostbuster
+on:
+  schedule:
+    - cron: "0 6 * * *"   # daily 06:00 UTC
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write   # only needed for the report issue in this repo
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: albertotranquilli-cmyk/bounty-ghostbuster@v0.1
+        with:
+          query: "commenter:app/algora-pbc is:issue is:open"
+          limit: "40"
+          issue-title: "👻 Daily bounty ghost report"

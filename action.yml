@@ -1,0 +1,68 @@
+name: "bounty-ghostbuster"
+description: "Scan GitHub bounty issues, flag phantom bounties (paid, cancelled, closed, archived, swarmed) and rank the rest by EV/hour."
+author: "albertotranquilli-cmyk"
+branding:
+  icon: "search"
+  color: "purple"
+inputs:
+  query:
+    description: "GitHub issue search query used to discover bounties"
+    default: "commenter:app/algora-pbc is:issue is:open"
+  issues:
+    description: "Optional space-separated owner/repo#N list (overrides query)"
+    default: ""
+  limit:
+    description: "Max issues to verify"
+    default: "30"
+  report-path:
+    description: "Where to write the markdown report in the workspace"
+    default: "ghostbuster-report.md"
+  issue-title:
+    description: "If set, create/update an issue with this title in THIS repository containing the report"
+    default: ""
+  token:
+    description: "Token used for read-only scanning (and, if issue-title is set, for writing the report issue in this repo)"
+    default: ${{ github.token }}
+outputs:
+  report-path:
+    description: "Path of the markdown report"
+    value: ${{ inputs.report-path }}
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Install bounty-ghostbuster
+      shell: bash
+      run: pip install --quiet "${{ github.action_path }}"
+    - name: Scan (read-only)
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.token }}
+        GB_QUERY: ${{ inputs.query }}
+        GB_ISSUES: ${{ inputs.issues }}
+        GB_LIMIT: ${{ inputs.limit }}
+        GB_OUT: ${{ inputs.report-path }}
+      run: |
+        if [ -n "$GB_ISSUES" ]; then
+          args=(); for i in $GB_ISSUES; do args+=(--issue "$i"); done
+          ghostbuster scan "${args[@]}" -o "$GB_OUT" --json-output "${GB_OUT%.md}.json"
+        else
+          ghostbuster scan --query "$GB_QUERY" --limit "$GB_LIMIT" -o "$GB_OUT" --json-output "${GB_OUT%.md}.json"
+        fi
+        cat "$GB_OUT" >> "$GITHUB_STEP_SUMMARY"
+    - name: Publish report issue in this repository
+      if: ${{ inputs.issue-title != '' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        TITLE: ${{ inputs.issue-title }}
+        GB_OUT: ${{ inputs.report-path }}
+      run: |
+        num=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$TITLE\" in:title" --json number --jq '.[0].number')
+        if [ -n "$num" ]; then
+          gh issue edit "$num" --repo "$GITHUB_REPOSITORY" --body-file "$GB_OUT"
+        else
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$GB_OUT"
+        fi

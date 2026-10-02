@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bounty-ghostbuster"
+version = "0.1.0"
+description = "Anti-phantom scanner for GitHub bounty issues: flags paid, cancelled, closed, archived and swarmed bounties and ranks the rest by EV/hour."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+ghostbuster = "ghostbuster.cli:main"
+
+[tool.setuptools]
+packages = ["ghostbuster"]
